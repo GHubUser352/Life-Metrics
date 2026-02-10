@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Life Metrics | Dashboard</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap"
+      rel="stylesheet"
+    />
+
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Plus Jakarta Sans", "sans-serif"],
+              mono: ["JetBrains Mono", "monospace"],
+            },
+          },
+        },
+      };
+    </script>
+
+    <style>
+      body {
+        transition: background-color 0.4s ease;
+        scrollbar-width: none;
+        overflow-x: hidden;
+      }
+      ::-webkit-scrollbar {
+        display: none;
+      }
+      .grid-life {
+        display: grid;
+        grid-template-columns: repeat(52, 1fr);
+        gap: 2px;
+        width: 100%;
+      }
+      .week-box {
+        aspect-ratio: 1;
+        border-radius: 1px;
+        background-color: #e2e8f0;
+        transition: background 0.3s;
+      }
+      .dark .week-box {
+        background-color: #1e293b;
+      }
+      .week-box.lived {
+        background-color: #10b981;
+      }
+      .pill-container {
+        background: rgba(156, 163, 175, 0.2);
+        padding: 3px;
+        border-radius: 12px;
+        display: inline-flex;
+      }
+      .pill-option {
+        padding: 6px 12px;
+        cursor: pointer;
+        border-radius: 10px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        transition: all 0.2s;
+        color: gray;
+      }
+      .pill-option-active {
+        background: white;
+        color: black;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+      .dark .pill-option-active {
+        background: #1e293b;
+        color: white;
+      }
+      .glass-input {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        padding: 12px 20px;
+        font-family: "JetBrains Mono", monospace;
+        outline: none;
+        width: 100%;
+      }
+      .dark .glass-input {
+        border-color: rgba(255, 255, 255, 0.1);
+      }
+      .glass-input:focus {
+        border-color: #10b981;
+        outline: 2px solid #10b981;
+      }
+      .stat-card {
+        background: white;
+        padding: 24px;
+        border-radius: 24px;
+        border: 1px solid #f1f5f9;
+      }
+      .dark .stat-card {
+        background: #0f172a;
+        border-color: #1e293b;
+      }
+      .fade-in {
+        animation: fadeIn 0.5s ease-out forwards;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(12px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+  <body
+    class="bg-[#f8fafc] text-slate-900 dark:bg-[#020617] dark:text-slate-100 min-h-screen"
+  >
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useMemo, useEffect, useRef } = React;
+
+      const Icon = ({ name, className }) => {
+        useEffect(() => {
+          if (window.lucide) window.lucide.createIcons();
+        });
+        return <i data-lucide={name} className={className}></i>;
+      };
+
+      const TRANSLATIONS = {
+        en: {
+          title: "Life Metrics",
+          label_date: "Birth date",
+          label_time: "Birth time",
+          btn_generate: "Generate",
+          unit_days: "Days",
+          unit_weeks: "Weeks",
+          unit_months: "Months",
+          unit_years: "Years",
+          cat_bio: "Biological Rhythm",
+          cat_eco: "Personal Ecosystem",
+          cat_global: "Global Impact",
+          cat_cosmic: "Cosmic Voyage",
+          cat_human: "Humanity & Society",
+          cat_modern: "Modern Life",
+          stat_heart: "Heartbeats",
+          stat_breath: "Breaths",
+          stat_sleep: "Sleep",
+          stat_water: "Water",
+          stat_trees: "Trees sustained",
+          stat_steps: "Steps",
+          stat_born: "People born",
+          stat_screen: "Screen time",
+          stat_digital: "Data generated",
+          stat_sun: "Sun orbit",
+          stat_galaxy: "Galaxy travel",
+          stat_sys: "Solar System",
+          stat_books: "Books read",
+          stat_words: "Words learned",
+          stat_blink: "Eye blinks",
+          stat_notifs: "Notifications",
+          stat_music: "Songs heard",
+          stat_coffee: "Drinks/Coffee",
+          share_btn: "Share",
+          share_msg: "Check out my life journey metrics!",
+          est: "est.",
+        },
+        fr: {
+          title: "Statistiques de Vie",
+          label_date: "Date de naissance",
+          label_time: "Heure de naissance",
+          btn_generate: "Générer",
+          unit_days: "Jours",
+          unit_weeks: "Semaines",
+          unit_months: "Mois",
+          unit_years: "Années",
+          cat_bio: "Rythme Biologique",
+          cat_eco: "Écosystème Personnel",
+          cat_global: "Impact Global",
+          cat_cosmic: "Voyage Cosmique",
+          cat_human: "Humanité & Société",
+          cat_modern: "Vie Moderne",
+          stat_heart: "Battements",
+          stat_breath: "Respirations",
+          stat_sleep: "Sommeil",
+          stat_water: "Eau bue",
+          stat_trees: "Arbres nourris",
+          stat_steps: "Pas effectués",
+          stat_born: "Nouveaux nés",
+          stat_screen: "Temps d'écran",
+          stat_digital: "Données",
+          stat_sun: "Orbite Solaire",
+          stat_galaxy: "Voyage Galactique",
+          stat_sys: "Système Solaire",
+          stat_books: "Livres lus",
+          stat_words: "Mots appris",
+          stat_blink: "Clignements d'yeux",
+          stat_notifs: "Notifications",
+          stat_music: "Musiques écoutées",
+          stat_coffee: "Boissons/Cafés",
+          share_btn: "Partager",
+          share_msg: "Regarde mes statistiques de vie !",
+          est: "est.",
+        },
+      };
+
+      function useAnimateValue(value) {
+        const [displayValue, setDisplayValue] = useState(value);
+        useEffect(() => {
+          let start = displayValue;
+          const end = value;
+          if (start === end) return;
+          const duration = 800;
+          let startTime = null;
+          const animate = (now) => {
+            if (!startTime) startTime = now;
+            const progress = Math.min((now - startTime) / duration, 1);
+            const current = Math.floor(start + (end - start) * progress);
+            setDisplayValue(current);
+            if (progress < 1) requestAnimationFrame(animate);
+          };
+          requestAnimationFrame(animate);
+        }, [value]);
+        return displayValue;
+      }
+
+      function App() {
+        const [lang, setLang] = useState(
+          () =>
+            localStorage.getItem("life-lang") ||
+            (navigator.language.startsWith("fr") ? "fr" : "en"),
+        );
+        const [isDark, setIsDark] = useState(() => {
+          const saved = localStorage.getItem("life-theme");
+          if (saved) return saved === "dark";
+          return window.matchMedia("(prefers-color-scheme: dark)").matches;
+        });
+
+        const [birthdate, setBirthdate] = useState("");
+        const [birthtime, setBirthtime] = useState("12:00");
+        const [showResult, setShowResult] = useState(false);
+        const [unit, setUnit] = useState("weeks");
+        const [now, setNow] = useState(new Date());
+
+        const t = TRANSLATIONS[lang];
+
+        useEffect(() => {
+          document.documentElement.classList.toggle("dark", isDark);
+          localStorage.setItem("life-theme", isDark ? "dark" : "light");
+          localStorage.setItem("life-lang", lang);
+        }, [isDark, lang]);
+
+        useEffect(() => {
+          const interval = setInterval(() => setNow(new Date()), 1000);
+          return () => clearInterval(interval);
+        }, []);
+
+        const rawStats = useMemo(() => {
+          if (!birthdate) return null;
+          const b = new Date(`${birthdate}T${birthtime}`);
+          const diffSec = (now - b) / 1000;
+          const days = diffSec / 86400;
+          return {
+            days: Math.floor(days),
+            weeks: Math.floor(days / 7),
+            months: Math.floor(days / 30.437),
+            years: (days / 365.25).toFixed(2),
+            heart: Math.floor(diffSec * 1.15),
+            breath: Math.floor(diffSec * 0.26),
+            sleep: Math.floor(days * 8),
+            water: Math.floor(days * 2),
+            trees: days * 0.05,
+            steps: Math.floor(days * 5500),
+            born: Math.floor(days * 385000),
+            screen: Math.floor(days * 4.5),
+            digital: Math.floor(days * 1.8),
+            km_sun: Math.floor(diffSec * 29.8),
+            km_gal: Math.floor(diffSec * 230),
+            km_sys: Math.floor(diffSec * 200),
+            books: Math.floor(days * 0.03),
+            words: Math.floor(days * 2.5),
+            blink: Math.floor(diffSec * 0.28),
+            notifs: Math.floor(days * 45),
+            music: Math.floor(days * 12),
+            coffee: Math.floor(days * 1.5),
+          };
+        }, [birthdate, birthtime, now]);
+
+        const handleShare = async () => {
+          const element = document.getElementById("dashboard-capture");
+          const canvas = await html2canvas(element, {
+            backgroundColor: isDark ? "#020617" : "#f8fafc",
+            scale: 2,
+          });
+          const blob = await new Promise((res) =>
+            canvas.toBlob(res, "image/png"),
+          );
+          const file = new File([blob], "life-metrics.png", {
+            type: "image/png",
+          });
+          if (navigator.share && navigator.canShare({ files: [file] })) {
+            try {
+              await navigator.share({
+                files: [file],
+                title: "Life Metrics",
+                text: t.share_msg,
+              });
+            } catch (e) {}
+          } else {
+            const link = document.createElement("a");
+            link.download = "life-metrics.png";
+            link.href = canvas.toDataURL();
+            link.click();
+          }
+        };
+
+        return (
+          <div className="flex flex-col min-h-screen p-4 md:p-12 max-w-7xl mx-auto w-full">
+            <header className="flex justify-between items-center mb-10">
+              <div className="flex items-center gap-3">
+                {showResult && (
+                  <button
+                    onClick={() => setShowResult(false)}
+                    className="p-2 rounded-lg bg-slate-200 dark:bg-slate-800 hover:scale-105 transition-all"
+                  >
+                    <Icon name="arrow-left" className="w-4 h-4" />
+                  </button>
+                )}
+                <div className="text-xl font-black italic tracking-tighter">
+                  CHRONOS<span className="text-emerald-500">.</span>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <div className="pill-container">
+                  <div
+                    onClick={() => setLang("en")}
+                    className={`pill-option ${lang === "en" ? "pill-option-active" : ""}`}
+                  >
+                    EN
+                  </div>
+                  <div
+                    onClick={() => setLang("fr")}
+                    className={`pill-option ${lang === "fr" ? "pill-option-active" : ""}`}
+                  >
+                    FR
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsDark(!isDark)}
+                  className="p-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                >
+                  <Icon name={isDark ? "sun" : "moon"} className="w-4 h-4" />
+                </button>
+              </div>
+            </header>
+
+            {!showResult ? (
+              <div className="flex-1 flex flex-col items-center justify-center space-y-8 fade-in">
+                <h1 className="text-5xl md:text-7xl font-black tracking-tighter text-center">
+                  {t.title}
+                </h1>
+                <div className="flex flex-col gap-4 w-full max-w-md px-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase opacity-50 ml-2">
+                      {t.label_date}
+                    </label>
+                    <input
+                      type="date"
+                      onChange={(e) => setBirthdate(e.target.value)}
+                      className="glass-input font-bold"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase opacity-50 ml-2">
+                      {t.label_time}
+                    </label>
+                    <input
+                      type="time"
+                      value={birthtime}
+                      onChange={(e) => setBirthtime(e.target.value)}
+                      className="glass-input font-bold"
+                    />
+                  </div>
+                  <button
+                    onClick={() => birthdate && setShowResult(true)}
+                    className="bg-emerald-500 text-black py-4 rounded-2xl font-black text-lg shadow-xl mt-4 active:scale-95 transition-transform"
+                  >
+                    {t.btn_generate}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div id="dashboard-capture" className="space-y-10 fade-in pb-10">
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
+                  <div>
+                    <h2 className="text-7xl md:text-9xl font-black tabular-nums leading-none tracking-tighter">
+                      {unit === "weeks"
+                        ? rawStats.weeks
+                        : unit === "days"
+                          ? rawStats.days
+                          : unit === "months"
+                            ? rawStats.months
+                            : rawStats.years}
+                    </h2>
+                    <div className="flex flex-wrap gap-4 mt-6">
+                      {["days", "weeks", "months", "years"].map((u) => (
+                        <button
+                          key={u}
+                          onClick={() => setUnit(u)}
+                          className={`text-[10px] font-black uppercase tracking-widest transition-all ${unit === u ? "text-emerald-500" : "opacity-20 hover:opacity-50"}`}
+                        >
+                          {t[`unit_${u}`]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleShare}
+                    className="flex items-center gap-2 bg-emerald-500 text-black px-8 py-4 rounded-2xl font-black text-sm shadow-xl hover:bg-emerald-400 transition-all w-full lg:w-auto justify-center"
+                  >
+                    <Icon name="share-2" className="w-4 h-4" /> {t.share_btn}
+                  </button>
+                </div>
+
+                <div className="grid-life">
+                  {[...Array(4160)].map((_, i) => (
+                    <div
+                      key={i}
+                      className={`week-box ${i < rawStats.weeks ? "lived" : ""}`}
+                    />
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <StatCard
+                    title={t.cat_bio}
+                    color="text-emerald-500"
+                    items={[
+                      { v: rawStats.heart, l: t.stat_heart },
+                      { v: rawStats.breath, l: t.stat_breath },
+                      {
+                        v: rawStats.sleep,
+                        l: t.stat_sleep,
+                        suffix: "h",
+                        est: true,
+                      },
+                    ]}
+                  />
+                  <StatCard
+                    title={t.cat_eco}
+                    color="text-blue-500"
+                    items={[
+                      {
+                        v: rawStats.water,
+                        l: t.stat_water,
+                        suffix: "L",
+                        est: true,
+                      },
+                      {
+                        v: rawStats.trees.toFixed(1),
+                        l: t.stat_trees,
+                        raw: true,
+                        est: true,
+                      },
+                      { v: rawStats.steps, l: t.stat_steps, est: true },
+                    ]}
+                  />
+                  <StatCard
+                    title={t.cat_global}
+                    color="text-purple-500"
+                    items={[
+                      { v: rawStats.born, l: t.stat_born, est: true },
+                      {
+                        v: rawStats.screen,
+                        l: t.stat_screen,
+                        suffix: "h",
+                        est: true,
+                      },
+                      {
+                        v: rawStats.digital,
+                        l: t.stat_digital,
+                        suffix: " GB",
+                        est: true,
+                      },
+                    ]}
+                  />
+                  <StatCard
+                    title={t.cat_human}
+                    color="text-rose-500"
+                    items={[
+                      { v: rawStats.books, l: t.stat_books, est: true },
+                      { v: rawStats.words, l: t.stat_words, est: true },
+                      { v: rawStats.blink, l: t.stat_blink },
+                    ]}
+                  />
+                  <StatCard
+                    title={t.cat_modern}
+                    color="text-indigo-500"
+                    items={[
+                      { v: rawStats.notifs, l: t.stat_notifs, est: true },
+                      { v: rawStats.music, l: t.stat_music, est: true },
+                      { v: rawStats.coffee, l: t.stat_coffee, est: true },
+                    ]}
+                  />
+                  <StatCard
+                    title={t.cat_cosmic}
+                    color="text-orange-500"
+                    items={[
+                      { v: rawStats.km_sun, l: t.stat_sun, suffix: " km" },
+                      { v: rawStats.km_gal, l: t.stat_galaxy, suffix: " km" },
+                      { v: rawStats.km_sys, l: t.stat_sys, suffix: " km" },
+                    ]}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      function StatCard({ title, items, color }) {
+        return (
+          <div className="stat-card hover:border-emerald-500/30 transition-all duration-300">
+            <h3
+              className={`text-[10px] font-black uppercase tracking-[0.2em] mb-6 ${color}`}
+            >
+              {title}
+            </h3>
+            <div className="space-y-6">
+              {items.map((it, i) => (
+                <div key={i}>
+                  <div className="text-3xl font-black tabular-nums tracking-tight flex items-baseline gap-2">
+                    <AnimatedNumber value={it.v} raw={it.raw} />
+                    {it.suffix}
+                    {it.est && (
+                      <span className="text-[9px] opacity-30 font-bold lowercase">
+                        est.
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[10px] font-bold opacity-30 uppercase mt-1">
+                    {it.l}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      function AnimatedNumber({ value, raw }) {
+        const num = parseFloat(value);
+        const animated = useAnimateValue(num);
+        return <span>{raw ? value : animated.toLocaleString()}</span>;
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>
