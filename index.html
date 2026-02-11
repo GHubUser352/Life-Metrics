@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Life Metrics | Dashboard</title>
+    <title>Life Metrics - GHubUser352</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -30,6 +30,16 @@
     </script>
 
     <style>
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+
       body {
         transition: background-color 0.4s ease;
         scrollbar-width: none;
@@ -38,24 +48,60 @@
       ::-webkit-scrollbar {
         display: none;
       }
+
+      /* Adaptive grid system */
       .grid-life {
         display: grid;
-        grid-template-columns: repeat(52, 1fr);
         gap: 2px;
         width: 100%;
       }
+
+      .grid-life.unit-days {
+        grid-template-columns: repeat(365, 1fr);
+        gap: 1px;
+      }
+
+      .grid-life.unit-weeks {
+        grid-template-columns: repeat(52, 1fr);
+        gap: 2px;
+      }
+
+      .grid-life.unit-months {
+        grid-template-columns: repeat(12, 1fr);
+        gap: 3px;
+      }
+
+      .grid-life.unit-years {
+        grid-template-columns: repeat(10, 1fr);
+        gap: 4px;
+      }
+
       .week-box {
         aspect-ratio: 1;
-        border-radius: 1px;
+        border-radius: 2px;
         background-color: #e2e8f0;
-        transition: background 0.3s;
+        transition:
+          background 0.3s,
+          transform 0.2s;
       }
+
+      .week-box:hover {
+        transform: scale(1.1);
+        z-index: 10;
+      }
+
       .dark .week-box {
         background-color: #1e293b;
       }
       .week-box.lived {
         background-color: #10b981;
       }
+
+      .week-box.milestone {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+      }
+
       .pill-container {
         background: rgba(156, 163, 175, 0.2);
         padding: 3px;
@@ -97,6 +143,10 @@
         border-color: #10b981;
         outline: 2px solid #10b981;
       }
+      .glass-input:focus-visible {
+        outline: 2px solid #10b981;
+        outline-offset: 2px;
+      }
       .stat-card {
         background: white;
         padding: 24px;
@@ -120,6 +170,65 @@
           transform: translateY(0);
         }
       }
+
+      /* Toast notifications */
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        z-index: 9999;
+        animation: slideIn 0.3s ease-out;
+      }
+
+      .dark .toast {
+        background: #0f172a;
+        border-color: #1e293b;
+      }
+
+      @keyframes slideIn {
+        from {
+          transform: translateX(400px);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      /* Loading spinner */
+      .spinner {
+        border: 3px solid rgba(16, 185, 129, 0.2);
+        border-top-color: #10b981;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Milestone badge */
+      .milestone-badge {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.65rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+      }
     </style>
   </head>
   <body
@@ -128,7 +237,43 @@
     <div id="root"></div>
 
     <script type="text/babel">
-      const { useState, useMemo, useEffect, useRef } = React;
+      const { useState, useMemo, useEffect, useRef, useCallback } = React;
+
+      // Constants
+      const STATS_MULTIPLIERS = {
+        HEART_RATE: 1.15,
+        BREATH_RATE: 0.26,
+        SLEEP_HOURS: 8,
+        WATER_LITERS: 2,
+        TREES_DAILY: 0.05,
+        STEPS_DAILY: 5500,
+        BIRTHS_DAILY: 385000,
+        SCREEN_HOURS: 4.5,
+        DATA_GB: 1.8,
+        SUN_KM_S: 29.8,
+        GALAXY_KM_S: 230,
+        SOLAR_KM_S: 200,
+        BOOKS_DAILY: 0.03,
+        WORDS_DAILY: 2.5,
+        BLINK_RATE: 0.28,
+        NOTIFS_DAILY: 45,
+        MUSIC_DAILY: 12,
+        COFFEE_DAILY: 1.5,
+      };
+
+      const GRID_CONFIG = {
+        days: { cols: 365, rows: 240, gap: 1, total: 87600 }, // 240 years in days
+        weeks: { cols: 52, rows: 80, gap: 2, total: 4160 }, // 80 years in weeks
+        months: { cols: 12, rows: 100, gap: 3, total: 1200 }, // 100 years in months
+        years: { cols: 10, rows: 10, gap: 4, total: 100 }, // 100 years
+      };
+
+      const MILESTONES = [
+        { value: 10000, label: "10K Days", type: "days" },
+        { value: 1000000, label: "1M Heartbeats", type: "heart" },
+        { value: 1000, label: "1K Weeks", type: "weeks" },
+        { value: 100, label: "Century", type: "months" },
+      ];
 
       const Icon = ({ name, className }) => {
         useEffect(() => {
@@ -173,7 +318,15 @@
           stat_coffee: "Drinks/Coffee",
           share_btn: "Share",
           share_msg: "Check out my life journey metrics!",
+          export_json: "Export JSON",
           est: "est.",
+          error_future: "Birth date cannot be in the future",
+          error_invalid: "Invalid date",
+          toast_copied: "Copied to clipboard!",
+          toast_shared: "Shared successfully!",
+          toast_error: "Share failed",
+          milestone_reached: "Milestone reached!",
+          life_progress: "Life Progress",
         },
         fr: {
           title: "Statistiques de Vie",
@@ -210,119 +363,360 @@
           stat_coffee: "Boissons/Cafés",
           share_btn: "Partager",
           share_msg: "Regarde mes statistiques de vie !",
+          export_json: "Exporter JSON",
           est: "est.",
+          error_future: "La date ne peut pas être dans le futur",
+          error_invalid: "Date invalide",
+          toast_copied: "Copié !",
+          toast_shared: "Partagé avec succès !",
+          toast_error: "Erreur de partage",
+          milestone_reached: "Jalon atteint !",
+          life_progress: "Progrès de vie",
         },
       };
 
-      function useAnimateValue(value) {
-        const [displayValue, setDisplayValue] = useState(value);
+      // Custom hooks
+      function usePersistedState(key, defaultValue) {
+        const [state, setState] = useState(() => {
+          try {
+            const item = localStorage.getItem(key);
+            return item ? JSON.parse(item) : defaultValue;
+          } catch {
+            return defaultValue;
+          }
+        });
+
         useEffect(() => {
-          let start = displayValue;
+          try {
+            localStorage.setItem(key, JSON.stringify(state));
+          } catch (e) {
+            console.error("localStorage error:", e);
+          }
+        }, [key, state]);
+
+        return [state, setState];
+      }
+
+      function useAnimateValue(value, enabled = true) {
+        const [displayValue, setDisplayValue] = useState(value);
+        const lastValueRef = useRef(value);
+        const frameIdRef = useRef(null);
+
+        useEffect(() => {
+          if (!enabled || lastValueRef.current === value) return;
+
+          const start = displayValue;
           const end = value;
-          if (start === end) return;
           const duration = 800;
           let startTime = null;
+
           const animate = (now) => {
             if (!startTime) startTime = now;
             const progress = Math.min((now - startTime) / duration, 1);
-            const current = Math.floor(start + (end - start) * progress);
+            const easing = 1 - Math.pow(1 - progress, 3); // Cubic easing
+            const current = Math.floor(start + (end - start) * easing);
             setDisplayValue(current);
-            if (progress < 1) requestAnimationFrame(animate);
+
+            if (progress < 1) {
+              frameIdRef.current = requestAnimationFrame(animate);
+            } else {
+              lastValueRef.current = value;
+            }
           };
-          requestAnimationFrame(animate);
-        }, [value]);
+
+          frameIdRef.current = requestAnimationFrame(animate);
+
+          return () => {
+            if (frameIdRef.current) {
+              cancelAnimationFrame(frameIdRef.current);
+            }
+          };
+        }, [value, enabled, displayValue]);
+
         return displayValue;
       }
 
-      function App() {
-        const [lang, setLang] = useState(
-          () =>
-            localStorage.getItem("life-lang") ||
-            (navigator.language.startsWith("fr") ? "fr" : "en"),
-        );
-        const [isDark, setIsDark] = useState(() => {
-          const saved = localStorage.getItem("life-theme");
-          if (saved) return saved === "dark";
-          return window.matchMedia("(prefers-color-scheme: dark)").matches;
-        });
+      function usePageVisibility() {
+        const [isVisible, setIsVisible] = useState(!document.hidden);
 
-        const [birthdate, setBirthdate] = useState("");
-        const [birthtime, setBirthtime] = useState("12:00");
+        useEffect(() => {
+          const handleVisibilityChange = () => {
+            setIsVisible(!document.hidden);
+          };
+
+          document.addEventListener("visibilitychange", handleVisibilityChange);
+          return () =>
+            document.removeEventListener(
+              "visibilitychange",
+              handleVisibilityChange,
+            );
+        }, []);
+
+        return isVisible;
+      }
+
+      // Toast component
+      function Toast({ message, type = "success", onClose }) {
+        useEffect(() => {
+          const timer = setTimeout(onClose, 3000);
+          return () => clearTimeout(timer);
+        }, [onClose]);
+
+        return (
+          <div className="toast" role="alert" aria-live="polite">
+            <div className="flex items-center gap-3">
+              <Icon
+                name={type === "success" ? "check-circle" : "alert-circle"}
+                className={`w-5 h-5 ${type === "success" ? "text-emerald-500" : "text-red-500"}`}
+              />
+              <span className="font-bold text-sm">{message}</span>
+            </div>
+          </div>
+        );
+      }
+
+      // Error Boundary
+      class ErrorBoundary extends React.Component {
+        constructor(props) {
+          super(props);
+          this.state = { hasError: false };
+        }
+
+        static getDerivedStateFromError(error) {
+          return { hasError: true };
+        }
+
+        componentDidCatch(error, errorInfo) {
+          console.error("Error caught:", error, errorInfo);
+        }
+
+        render() {
+          if (this.state.hasError) {
+            return (
+              <div className="flex items-center justify-center min-h-screen p-4">
+                <div className="text-center">
+                  <h1 className="text-2xl font-black mb-4">
+                    Something went wrong
+                  </h1>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="bg-emerald-500 text-black px-6 py-3 rounded-xl font-bold"
+                  >
+                    Reload
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          return this.props.children;
+        }
+      }
+
+      function App() {
+        const [lang, setLang] = usePersistedState(
+          "life-lang",
+          navigator.language.startsWith("fr") ? "fr" : "en",
+        );
+        const [isDark, setIsDark] = usePersistedState(
+          "life-theme",
+          window.matchMedia("(prefers-color-scheme: dark)").matches,
+        );
+        const [birthdate, setBirthdate] = usePersistedState(
+          "life-birthdate",
+          "",
+        );
+        const [birthtime, setBirthtime] = usePersistedState(
+          "life-birthtime",
+          "12:00",
+        );
         const [showResult, setShowResult] = useState(false);
         const [unit, setUnit] = useState("weeks");
         const [now, setNow] = useState(new Date());
+        const [toast, setToast] = useState(null);
+        const [isSharing, setIsSharing] = useState(false);
+        const [dateError, setDateError] = useState("");
+
+        const isPageVisible = usePageVisibility();
+        const prefersReducedMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
 
         const t = TRANSLATIONS[lang];
 
         useEffect(() => {
           document.documentElement.classList.toggle("dark", isDark);
-          localStorage.setItem("life-theme", isDark ? "dark" : "light");
-          localStorage.setItem("life-lang", lang);
-        }, [isDark, lang]);
+        }, [isDark]);
 
+        // Clock with page visibility
         useEffect(() => {
-          const interval = setInterval(() => setNow(new Date()), 1000);
+          if (!isPageVisible) return;
+
+          const interval = setInterval(() => {
+            setNow(new Date());
+          }, 1000);
+
           return () => clearInterval(interval);
-        }, []);
+        }, [isPageVisible]);
+
+        // Validate date
+        const validateDate = useCallback(
+          (date, time) => {
+            if (!date) return "";
+
+            const birthDateTime = new Date(`${date}T${time}`);
+            const minDate = new Date("1900-01-01");
+
+            if (isNaN(birthDateTime.getTime())) {
+              return t.error_invalid;
+            }
+            if (birthDateTime > new Date()) {
+              return t.error_future;
+            }
+            if (birthDateTime < minDate) {
+              return t.error_invalid;
+            }
+
+            return "";
+          },
+          [t],
+        );
 
         const rawStats = useMemo(() => {
           if (!birthdate) return null;
+
           const b = new Date(`${birthdate}T${birthtime}`);
-          const diffSec = (now - b) / 1000;
+          const diffMs = now - b;
+          const diffSec = diffMs / 1000;
           const days = diffSec / 86400;
+
           return {
             days: Math.floor(days),
             weeks: Math.floor(days / 7),
             months: Math.floor(days / 30.437),
             years: (days / 365.25).toFixed(2),
-            heart: Math.floor(diffSec * 1.15),
-            breath: Math.floor(diffSec * 0.26),
-            sleep: Math.floor(days * 8),
-            water: Math.floor(days * 2),
-            trees: days * 0.05,
-            steps: Math.floor(days * 5500),
-            born: Math.floor(days * 385000),
-            screen: Math.floor(days * 4.5),
-            digital: Math.floor(days * 1.8),
-            km_sun: Math.floor(diffSec * 29.8),
-            km_gal: Math.floor(diffSec * 230),
-            km_sys: Math.floor(diffSec * 200),
-            books: Math.floor(days * 0.03),
-            words: Math.floor(days * 2.5),
-            blink: Math.floor(diffSec * 0.28),
-            notifs: Math.floor(days * 45),
-            music: Math.floor(days * 12),
-            coffee: Math.floor(days * 1.5),
+            heart: Math.floor(diffSec * STATS_MULTIPLIERS.HEART_RATE),
+            breath: Math.floor(diffSec * STATS_MULTIPLIERS.BREATH_RATE),
+            sleep: Math.floor(days * STATS_MULTIPLIERS.SLEEP_HOURS),
+            water: Math.floor(days * STATS_MULTIPLIERS.WATER_LITERS),
+            trees: (days * STATS_MULTIPLIERS.TREES_DAILY).toFixed(1),
+            steps: Math.floor(days * STATS_MULTIPLIERS.STEPS_DAILY),
+            born: Math.floor(days * STATS_MULTIPLIERS.BIRTHS_DAILY),
+            screen: Math.floor(days * STATS_MULTIPLIERS.SCREEN_HOURS),
+            digital: Math.floor(days * STATS_MULTIPLIERS.DATA_GB),
+            km_sun: Math.floor(diffSec * STATS_MULTIPLIERS.SUN_KM_S),
+            km_gal: Math.floor(diffSec * STATS_MULTIPLIERS.GALAXY_KM_S),
+            km_sys: Math.floor(diffSec * STATS_MULTIPLIERS.SOLAR_KM_S),
+            books: Math.floor(days * STATS_MULTIPLIERS.BOOKS_DAILY),
+            words: Math.floor(days * STATS_MULTIPLIERS.WORDS_DAILY),
+            blink: Math.floor(diffSec * STATS_MULTIPLIERS.BLINK_RATE),
+            notifs: Math.floor(days * STATS_MULTIPLIERS.NOTIFS_DAILY),
+            music: Math.floor(days * STATS_MULTIPLIERS.MUSIC_DAILY),
+            coffee: Math.floor(days * STATS_MULTIPLIERS.COFFEE_DAILY),
           };
         }, [birthdate, birthtime, now]);
 
+        // Check milestones
+        const milestones = useMemo(() => {
+          if (!rawStats) return [];
+          return MILESTONES.filter((m) => {
+            const value = rawStats[m.type];
+            return value && value >= m.value;
+          });
+        }, [rawStats]);
+
+        const handleDateChange = (e) => {
+          const newDate = e.target.value;
+          const error = validateDate(newDate, birthtime);
+          setDateError(error);
+          if (!error) {
+            setBirthdate(newDate);
+          }
+        };
+
+        const handleGenerate = () => {
+          const error = validateDate(birthdate, birthtime);
+          if (error) {
+            setDateError(error);
+            return;
+          }
+          setShowResult(true);
+        };
+
         const handleShare = async () => {
-          const element = document.getElementById("dashboard-capture");
-          const canvas = await html2canvas(element, {
-            backgroundColor: isDark ? "#020617" : "#f8fafc",
-            scale: 2,
-          });
-          const blob = await new Promise((res) =>
-            canvas.toBlob(res, "image/png"),
-          );
-          const file = new File([blob], "life-metrics.png", {
-            type: "image/png",
-          });
-          if (navigator.share && navigator.canShare({ files: [file] })) {
-            try {
+          setIsSharing(true);
+
+          try {
+            const element = document.getElementById("dashboard-capture");
+            const canvas = await html2canvas(element, {
+              backgroundColor: isDark ? "#020617" : "#f8fafc",
+              scale: 2,
+              logging: false,
+              useCORS: true,
+            });
+
+            const blob = await new Promise((res) =>
+              canvas.toBlob(res, "image/png", 0.95),
+            );
+
+            const file = new File([blob], "life-metrics.png", {
+              type: "image/png",
+            });
+
+            if (navigator.share && navigator.canShare({ files: [file] })) {
               await navigator.share({
                 files: [file],
                 title: "Life Metrics",
                 text: t.share_msg,
               });
-            } catch (e) {}
-          } else {
-            const link = document.createElement("a");
-            link.download = "life-metrics.png";
-            link.href = canvas.toDataURL();
-            link.click();
+              setToast({ message: t.toast_shared, type: "success" });
+            } else {
+              // Fallback: download
+              const link = document.createElement("a");
+              link.download = "life-metrics.png";
+              link.href = canvas.toDataURL("image/png");
+              link.click();
+              setToast({ message: t.toast_copied, type: "success" });
+            }
+          } catch (e) {
+            console.error("Share error:", e);
+            setToast({ message: t.toast_error, type: "error" });
+          } finally {
+            setIsSharing(false);
           }
         };
+
+        const handleExportJSON = () => {
+          if (!rawStats) return;
+
+          const data = {
+            birthdate,
+            birthtime,
+            generated: new Date().toISOString(),
+            stats: rawStats,
+          };
+
+          const blob = new Blob([JSON.stringify(data, null, 2)], {
+            type: "application/json",
+          });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.download = "life-metrics.json";
+          link.href = url;
+          link.click();
+          URL.revokeObjectURL(url);
+
+          setToast({ message: t.toast_copied, type: "success" });
+        };
+
+        const currentValue =
+          unit === "weeks"
+            ? rawStats?.weeks
+            : unit === "days"
+              ? rawStats?.days
+              : unit === "months"
+                ? rawStats?.months
+                : rawStats?.years;
 
         return (
           <div className="flex flex-col min-h-screen p-4 md:p-12 max-w-7xl mx-auto w-full">
@@ -331,7 +725,8 @@
                 {showResult && (
                   <button
                     onClick={() => setShowResult(false)}
-                    className="p-2 rounded-lg bg-slate-200 dark:bg-slate-800 hover:scale-105 transition-all"
+                    className="p-2 rounded-lg bg-slate-200 dark:bg-slate-800 hover:scale-105 transition-all focus-visible:outline-2 focus-visible:outline-emerald-500"
+                    aria-label="Go back"
                   >
                     <Icon name="arrow-left" className="w-4 h-4" />
                   </button>
@@ -341,23 +736,32 @@
                 </div>
               </div>
               <div className="flex gap-2">
-                <div className="pill-container">
-                  <div
+                <div
+                  className="pill-container"
+                  role="group"
+                  aria-label="Language selector"
+                >
+                  <button
                     onClick={() => setLang("en")}
                     className={`pill-option ${lang === "en" ? "pill-option-active" : ""}`}
+                    aria-pressed={lang === "en"}
                   >
                     EN
-                  </div>
-                  <div
+                  </button>
+                  <button
                     onClick={() => setLang("fr")}
                     className={`pill-option ${lang === "fr" ? "pill-option-active" : ""}`}
+                    aria-pressed={lang === "fr"}
                   >
                     FR
-                  </div>
+                  </button>
                 </div>
                 <button
                   onClick={() => setIsDark(!isDark)}
-                  className="p-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                  className="p-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 focus-visible:outline-2 focus-visible:outline-emerald-500"
+                  aria-label={
+                    isDark ? "Switch to light mode" : "Switch to dark mode"
+                  }
                 >
                   <Icon name={isDark ? "sun" : "moon"} className="w-4 h-4" />
                 </button>
@@ -371,20 +775,42 @@
                 </h1>
                 <div className="flex flex-col gap-4 w-full max-w-md px-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase opacity-50 ml-2">
+                    <label
+                      htmlFor="birthdate"
+                      className="text-[10px] font-bold uppercase opacity-50 ml-2"
+                    >
                       {t.label_date}
                     </label>
                     <input
+                      id="birthdate"
                       type="date"
-                      onChange={(e) => setBirthdate(e.target.value)}
-                      className="glass-input font-bold"
+                      value={birthdate}
+                      onChange={handleDateChange}
+                      min="1900-01-01"
+                      max={new Date().toISOString().split("T")[0]}
+                      className={`glass-input font-bold ${dateError ? "border-red-500" : ""}`}
+                      aria-invalid={!!dateError}
+                      aria-describedby={dateError ? "date-error" : undefined}
                     />
+                    {dateError && (
+                      <p
+                        id="date-error"
+                        className="text-red-500 text-xs ml-2 mt-1"
+                        role="alert"
+                      >
+                        {dateError}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase opacity-50 ml-2">
+                    <label
+                      htmlFor="birthtime"
+                      className="text-[10px] font-bold uppercase opacity-50 ml-2"
+                    >
                       {t.label_time}
                     </label>
                     <input
+                      id="birthtime"
                       type="time"
                       value={birthtime}
                       onChange={(e) => setBirthtime(e.target.value)}
@@ -392,8 +818,10 @@
                     />
                   </div>
                   <button
-                    onClick={() => birthdate && setShowResult(true)}
-                    className="bg-emerald-500 text-black py-4 rounded-2xl font-black text-lg shadow-xl mt-4 active:scale-95 transition-transform"
+                    onClick={handleGenerate}
+                    disabled={!birthdate || !!dateError}
+                    className="bg-emerald-500 text-black py-4 rounded-2xl font-black text-lg shadow-xl mt-4 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-emerald-500"
+                    aria-label={t.btn_generate}
                   >
                     {t.btn_generate}
                   </button>
@@ -404,42 +832,69 @@
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
                   <div>
                     <h2 className="text-7xl md:text-9xl font-black tabular-nums leading-none tracking-tighter">
-                      {unit === "weeks"
-                        ? rawStats.weeks
-                        : unit === "days"
-                          ? rawStats.days
-                          : unit === "months"
-                            ? rawStats.months
-                            : rawStats.years}
+                      {currentValue}
                     </h2>
-                    <div className="flex flex-wrap gap-4 mt-6">
+                    {milestones.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        {milestones.map((m, i) => (
+                          <span key={i} className="milestone-badge">
+                            🎉 {m.label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div
+                      className="flex flex-wrap gap-4 mt-6"
+                      role="group"
+                      aria-label="Time unit selector"
+                    >
                       {["days", "weeks", "months", "years"].map((u) => (
                         <button
                           key={u}
                           onClick={() => setUnit(u)}
-                          className={`text-[10px] font-black uppercase tracking-widest transition-all ${unit === u ? "text-emerald-500" : "opacity-20 hover:opacity-50"}`}
+                          className={`text-[10px] font-black uppercase tracking-widest transition-all focus-visible:outline-2 focus-visible:outline-emerald-500 ${
+                            unit === u
+                              ? "text-emerald-500"
+                              : "opacity-20 hover:opacity-50"
+                          }`}
+                          aria-pressed={unit === u}
                         >
                           {t[`unit_${u}`]}
                         </button>
                       ))}
                     </div>
                   </div>
-                  <button
-                    onClick={handleShare}
-                    className="flex items-center gap-2 bg-emerald-500 text-black px-8 py-4 rounded-2xl font-black text-sm shadow-xl hover:bg-emerald-400 transition-all w-full lg:w-auto justify-center"
-                  >
-                    <Icon name="share-2" className="w-4 h-4" /> {t.share_btn}
-                  </button>
+                  <div className="flex gap-3 w-full lg:w-auto">
+                    <button
+                      onClick={handleExportJSON}
+                      className="flex items-center gap-2 bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-6 py-4 rounded-2xl font-black text-sm shadow-xl hover:bg-slate-300 dark:hover:bg-slate-700 transition-all flex-1 lg:flex-initial justify-center focus-visible:outline-2 focus-visible:outline-emerald-500"
+                      aria-label={t.export_json}
+                    >
+                      <Icon name="download" className="w-4 h-4" />{" "}
+                      {t.export_json}
+                    </button>
+                    <button
+                      onClick={handleShare}
+                      disabled={isSharing}
+                      className="flex items-center gap-2 bg-emerald-500 text-black px-8 py-4 rounded-2xl font-black text-sm shadow-xl hover:bg-emerald-400 transition-all flex-1 lg:flex-initial justify-center disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-white"
+                      aria-label={t.share_btn}
+                    >
+                      {isSharing ? (
+                        <div className="spinner" />
+                      ) : (
+                        <Icon name="share-2" className="w-4 h-4" />
+                      )}
+                      {t.share_btn}
+                    </button>
+                  </div>
                 </div>
 
-                <div className="grid-life">
-                  {[...Array(4160)].map((_, i) => (
-                    <div
-                      key={i}
-                      className={`week-box ${i < rawStats.weeks ? "lived" : ""}`}
-                    />
-                  ))}
-                </div>
+                <GridLife
+                  unit={unit}
+                  lived={rawStats[unit === "years" ? "years" : unit]}
+                  total={GRID_CONFIG[unit].total}
+                  config={GRID_CONFIG[unit]}
+                />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   <StatCard
@@ -455,6 +910,7 @@
                         est: true,
                       },
                     ]}
+                    prefersReducedMotion={prefersReducedMotion}
                   />
                   <StatCard
                     title={t.cat_eco}
@@ -467,13 +923,14 @@
                         est: true,
                       },
                       {
-                        v: rawStats.trees.toFixed(1),
+                        v: rawStats.trees,
                         l: t.stat_trees,
                         raw: true,
                         est: true,
                       },
                       { v: rawStats.steps, l: t.stat_steps, est: true },
                     ]}
+                    prefersReducedMotion={prefersReducedMotion}
                   />
                   <StatCard
                     title={t.cat_global}
@@ -493,6 +950,7 @@
                         est: true,
                       },
                     ]}
+                    prefersReducedMotion={prefersReducedMotion}
                   />
                   <StatCard
                     title={t.cat_human}
@@ -502,6 +960,7 @@
                       { v: rawStats.words, l: t.stat_words, est: true },
                       { v: rawStats.blink, l: t.stat_blink },
                     ]}
+                    prefersReducedMotion={prefersReducedMotion}
                   />
                   <StatCard
                     title={t.cat_modern}
@@ -511,6 +970,7 @@
                       { v: rawStats.music, l: t.stat_music, est: true },
                       { v: rawStats.coffee, l: t.stat_coffee, est: true },
                     ]}
+                    prefersReducedMotion={prefersReducedMotion}
                   />
                   <StatCard
                     title={t.cat_cosmic}
@@ -520,17 +980,54 @@
                       { v: rawStats.km_gal, l: t.stat_galaxy, suffix: " km" },
                       { v: rawStats.km_sys, l: t.stat_sys, suffix: " km" },
                     ]}
+                    prefersReducedMotion={prefersReducedMotion}
                   />
                 </div>
               </div>
+            )}
+
+            {toast && (
+              <Toast
+                message={toast.message}
+                type={toast.type}
+                onClose={() => setToast(null)}
+              />
             )}
           </div>
         );
       }
 
-      function StatCard({ title, items, color }) {
+      function GridLife({ unit, lived, total, config }) {
+        const livedNum = parseFloat(lived);
+
         return (
-          <div className="stat-card hover:border-emerald-500/30 transition-all duration-300">
+          <div
+            className={`grid-life unit-${unit}`}
+            role="img"
+            aria-label={`Life visualization grid showing ${livedNum} ${unit} lived`}
+          >
+            {[...Array(total)].map((_, i) => {
+              const isLived = i < livedNum;
+              const isMilestone = isLived && (i + 1) % 1000 === 0;
+
+              return (
+                <div
+                  key={i}
+                  className={`week-box ${isLived ? "lived" : ""} ${isMilestone ? "milestone" : ""}`}
+                  title={isMilestone ? `Milestone: ${i + 1}` : undefined}
+                  aria-label={
+                    isMilestone ? `Milestone at ${i + 1} ${unit}` : undefined
+                  }
+                />
+              );
+            })}
+          </div>
+        );
+      }
+
+      function StatCard({ title, items, color, prefersReducedMotion }) {
+        return (
+          <article className="stat-card hover:border-emerald-500/30 transition-all duration-300">
             <h3
               className={`text-[10px] font-black uppercase tracking-[0.2em] mb-6 ${color}`}
             >
@@ -540,7 +1037,11 @@
               {items.map((it, i) => (
                 <div key={i}>
                   <div className="text-3xl font-black tabular-nums tracking-tight flex items-baseline gap-2">
-                    <AnimatedNumber value={it.v} raw={it.raw} />
+                    <AnimatedNumber
+                      value={it.v}
+                      raw={it.raw}
+                      enabled={!prefersReducedMotion}
+                    />
                     {it.suffix}
                     {it.est && (
                       <span className="text-[9px] opacity-30 font-bold lowercase">
@@ -554,17 +1055,22 @@
                 </div>
               ))}
             </div>
-          </div>
+          </article>
         );
       }
 
-      function AnimatedNumber({ value, raw }) {
+      function AnimatedNumber({ value, raw, enabled }) {
         const num = parseFloat(value);
-        const animated = useAnimateValue(num);
+        const animated = useAnimateValue(num, enabled);
         return <span>{raw ? value : animated.toLocaleString()}</span>;
       }
 
-      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+      // Root render with error boundary
+      ReactDOM.createRoot(document.getElementById("root")).render(
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>,
+      );
     </script>
   </body>
 </html>
