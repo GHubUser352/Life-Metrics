@@ -104,16 +104,6 @@ Les contributions sont les bienvenues !
 
 ---
 
-## 🙏 Remerciements
-
-- **QRious** : Moteur QR ultra-léger
-- **Lucide** : Icons magnifiques
-- **Tailwind** : Design system moderne
-- **FlagCDN** : Drapeaux HD gratuits
-- **Communauté React** : Pour l'écosystème incroyable
-
----
-
 ## 📞 Contact & Support
 
 - **GitHub** : [@GHubUser352](https://github.com/GHubUser352)
